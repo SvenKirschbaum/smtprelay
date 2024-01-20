@@ -1,13 +1,16 @@
-FROM golang:1.22-alpine as build
+# syntax=docker/dockerfile-upstream:master
+FROM --platform=$BUILDPLATFORM golang:1.22-alpine as build
 
 RUN apk add --no-cache ca-certificates make git
 
 WORKDIR /go/src/github.com/grafana/smtprelay
 
+ARG BUILDPLATFORM
+ARG TARGETPLATFORM
 ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
-ENV GOOS=${TARGETOS} GOARCH=${TARGETARCH} GOARM=${TARGETVARIANT}
+ENV GOOS=${TARGETOS} GOARCH=${TARGETARCH} GOARM=${TARGETVARIANT#v}
 
 ENV CGO_ENABLED=0
 
@@ -16,8 +19,11 @@ RUN go mod download -x
 
 COPY . ./
 RUN make build
+
 # sanity check - make sure the binary runs and is executable
-RUN bin/smtprelay --version
+RUN if [[ "$BUILDPLATFORM" == "$TARGETPLATFORM" ]]; then \
+       bin/smtprelay --version; \
+    fi
 
 FROM alpine:3.20 AS runtime
 
