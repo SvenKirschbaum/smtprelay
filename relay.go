@@ -267,6 +267,60 @@ func (r *relay) recipientChecker(allowed, denied string) func(ctx context.Contex
 	}
 }
 
+func sendMailWithHelo(addr string, helo string, a smtp.Auth, from string, to []string, msg []byte) error {
+	client, err := smtp.Dial(addr)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	err = client.Hello(helo)
+	if err != nil {
+		return err
+	}
+
+	host, _, _ := net.SplitHostPort(addr)
+
+	if ok, _ := client.Extension("STARTTLS"); ok {
+		config := &tls.Config{ServerName: host}
+		if err = client.StartTLS(config); err != nil {
+			return err
+		}
+	}
+
+	supportAuth, _ := client.Extension("AUTH")
+	if a != nil {
+		if !supportAuth {
+			return errors.New("smtp: server doesn't support AUTH")
+		}
+		if err = client.Auth(a); err != nil {
+			return err
+		}
+	}
+
+	if err = client.Mail(from); err != nil {
+		return err
+	}
+	for _, addr := range to {
+		if err = client.Rcpt(addr); err != nil {
+			return err
+		}
+	}
+	w, err := client.Data()
+	if err != nil {
+		return err
+	}
+	_, err = w.Write(msg)
+	if err != nil {
+		return err
+	}
+	err = w.Close()
+	if err != nil {
+		return err
+	}
+	return client.Quit()
+}
+
 func (r *relay) mailHandler(cfg *config) func(ctx context.Context, peer smtpd.Peer, env smtpd.Envelope) error {
 	return func(ctx context.Context, peer smtpd.Peer, env smtpd.Envelope) error {
 		// save upstream span as a link, we're going to re-parent this span to
@@ -336,8 +390,9 @@ func (r *relay) mailHandler(cfg *config) func(ctx context.Context, peer smtpd.Pe
 			observeDuration(ctx, statusCode, time.Since(start))
 		}()
 
-		err = smtp.SendMail(
+		err = sendMailWithHelo(
 			cfg.remoteHost,
+			cfg.remoteHelo,
 			auth,
 			sender,
 			env.Recipients,
