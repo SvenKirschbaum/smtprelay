@@ -29,6 +29,7 @@ type config struct {
 	allowedUsers      string
 	remoteHost        string
 	remoteUser        string
+	remoteHelo        string
 	maxMessageSize    int
 	maxConnections    int
 	maxRecipients     int
@@ -120,6 +121,7 @@ func registerFlags(f *flag.FlagSet, cfg *config) {
 	f.StringVar(&cfg.allowedUsers, "allowed_users", "", "Path to file with valid users/passwords (leave empty to allow any user)")
 	f.StringVar(&cfg.remoteHost, "remote_host", "smtp.gmail.com:587", "Outgoing SMTP server")
 	f.StringVar(&cfg.remoteUser, "remote_user", "", "Username for authentication on outgoing SMTP server")
+	f.StringVar(&cfg.remoteHelo, "remote_helo", "localhost", "HELO/EHLO to send to outgoing SMTP server")
 	f.IntVar(&cfg.maxMessageSize, "max_message_size", 51200000, "Max message size allowed in bytes")
 	f.IntVar(&cfg.maxConnections, "max_connections", 100, "Max number of concurrent connections, use -1 to disable")
 	f.IntVar(&cfg.maxRecipients, "max_recipients", 100, "Max number of recipients on an email")
